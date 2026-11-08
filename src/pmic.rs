@@ -3,7 +3,7 @@
 //! No reset, wake, charge, boost, or other persistent power settings are touched.
 
 pub const ADDRESS: u8 = 0x6e;
-const DEVICE_ID: u16 = 0x2050;
+const DEVICE_ID: u8 = 0x6e; // M5PM1 device-ID register 0x00 (M5Stack library)
 const GPIO_MODE: u8 = 0x10;
 const GPIO_OUT: u8 = 0x11;
 const GPIO_DRV: u8 = 0x13;
@@ -20,7 +20,7 @@ pub trait RegisterBus {
 #[derive(Debug, PartialEq, Eq)]
 pub enum PowerError<E> {
     Bus(E),
-    WrongDevice { found: u16 },
+    WrongDevice { found: u8 },
     VerificationFailed { register: u8 },
 }
 
@@ -42,9 +42,7 @@ fn change_bits<B: RegisterBus>(bus: &mut B, register: u8, mask: u8, bits: u8)
 /// Caller must resolve the board-specific ON polarity before using this.
 /// Aborts before writing if device identity differs. Prior pin state is not restored.
 pub fn set_l3b_level<B: RegisterBus>(bus: &mut B, high: bool) -> Result<(), PowerError<B::Error>> {
-    let lo = bus.read(0x00).map_err(PowerError::Bus)?;
-    let hi = bus.read(0x01).map_err(PowerError::Bus)?;
-    let found = u16::from_le_bytes([lo, hi]);
+    let found = bus.read(0x00).map_err(PowerError::Bus)?;
     if found != DEVICE_ID { return Err(PowerError::WrongDevice { found }); }
     // Preload enabled output level, select GPIO, push-pull, output direction.
     change_bits(bus, GPIO_OUT, L3B_BIT, if high { L3B_BIT } else { 0 })?;
@@ -59,7 +57,7 @@ mod tests {
     use super::*;
     struct Fake { regs: [u8; 256], writes: Vec<(u8,u8)>, corrupt: Option<u8> }
     impl Fake {
-        fn valid() -> Self { let mut regs=[0; 256]; regs[0]=0x50; regs[1]=0x20;
+        fn valid() -> Self { let mut regs=[0; 256]; regs[0]=0x6e; regs[1]=0x20;
             Self { regs, writes: Vec::new(), corrupt: None } }
     }
     impl RegisterBus for Fake {
@@ -72,8 +70,8 @@ mod tests {
         }
     }
     #[test] fn identity_must_match_before_mutation() {
-        let mut f=Fake::valid(); f.regs[1]=0;
-        assert_eq!(set_l3b_level(&mut f, true), Err(PowerError::WrongDevice { found: 0x50 }));
+        let mut f=Fake::valid(); f.regs[0]=0;
+        assert_eq!(set_l3b_level(&mut f, true), Err(PowerError::WrongDevice { found: 0 }));
         assert!(f.writes.is_empty());
     }
     #[test] fn only_gpio2_fields_are_changed() {
