@@ -37,16 +37,17 @@ fn change_bits<B: RegisterBus>(bus: &mut B, register: u8, mask: u8, bits: u8)
     Ok(())
 }
 
-/// Enables only GPIO2-controlled L3B. Aborts before all writes if ID differs.
-/// Prior GPIO2 configuration is not restored; don't call for power-down.
-/// Exact electrical behavior requires validation on StickS3 hardware.
-pub fn enable_l3b<B: RegisterBus>(bus: &mut B) -> Result<(), PowerError<B::Error>> {
+/// Sets PYG2/L3B to the explicitly supplied electrical logic level.
+/// M5Stack's L3B example uses LOW; another port reports HIGH.
+/// Caller must resolve the board-specific ON polarity before using this.
+/// Aborts before writing if device identity differs. Prior pin state is not restored.
+pub fn set_l3b_level<B: RegisterBus>(bus: &mut B, high: bool) -> Result<(), PowerError<B::Error>> {
     let lo = bus.read(0x00).map_err(PowerError::Bus)?;
     let hi = bus.read(0x01).map_err(PowerError::Bus)?;
     let found = u16::from_le_bytes([lo, hi]);
     if found != DEVICE_ID { return Err(PowerError::WrongDevice { found }); }
     // Preload enabled output level, select GPIO, push-pull, output direction.
-    change_bits(bus, GPIO_OUT, L3B_BIT, L3B_BIT)?;
+    change_bits(bus, GPIO_OUT, L3B_BIT, if high { L3B_BIT } else { 0 })?;
     change_bits(bus, GPIO_FUNC0, L3B_FUNC_MASK, 0)?;
     change_bits(bus, GPIO_DRV, L3B_BIT, 0)?;
     change_bits(bus, GPIO_MODE, L3B_BIT, L3B_BIT)?;
@@ -72,13 +73,13 @@ mod tests {
     }
     #[test] fn identity_must_match_before_mutation() {
         let mut f=Fake::valid(); f.regs[1]=0;
-        assert_eq!(enable_l3b(&mut f), Err(PowerError::WrongDevice { found: 0x50 }));
+        assert_eq!(set_l3b_level(&mut f, true), Err(PowerError::WrongDevice { found: 0x50 }));
         assert!(f.writes.is_empty());
     }
     #[test] fn only_gpio2_fields_are_changed() {
         let mut f=Fake::valid(); f.regs[GPIO_MODE as usize]=0b10001;
         f.regs[GPIO_FUNC0 as usize]=0xff; f.regs[GPIO_DRV as usize]=0xff;
-        enable_l3b(&mut f).unwrap();
+        set_l3b_level(&mut f, true).unwrap();
         assert_eq!(f.regs[GPIO_MODE as usize], 0b10101);
         assert_eq!(f.regs[GPIO_OUT as usize] & L3B_BIT,L3B_BIT);
         assert_eq!(f.regs[GPIO_DRV as usize],0xfb);
@@ -86,12 +87,18 @@ mod tests {
         assert_eq!(f.writes.len(),4);
     }
     #[test] fn no_extra_writes_if_already_enabled() {
-        let mut f=Fake::valid();enable_l3b(&mut f).unwrap();
-        f.writes.clear();enable_l3b(&mut f).unwrap();assert!(f.writes.is_empty());
+        let mut f=Fake::valid();set_l3b_level(&mut f, true).unwrap();
+        f.writes.clear();set_l3b_level(&mut f, true).unwrap();assert!(f.writes.is_empty());
+    }
+    #[test] fn supports_explicit_low_polarity_without_touching_other_gpio() {
+        let mut f=Fake::valid(); f.regs[GPIO_OUT as usize]=0xff;
+        set_l3b_level(&mut f,false).unwrap();
+        assert_eq!(f.regs[GPIO_OUT as usize],0xfb);
+        assert_eq!(f.regs[GPIO_MODE as usize]&L3B_BIT,L3B_BIT);
     }
     #[test] fn readback_failure_stops_sequence() {
         let mut f=Fake::valid();f.corrupt=Some(GPIO_OUT);
-        assert_eq!(enable_l3b(&mut f),Err(PowerError::VerificationFailed{register:GPIO_OUT}));
+        assert_eq!(set_l3b_level(&mut f, true),Err(PowerError::VerificationFailed{register:GPIO_OUT}));
         assert_eq!(f.writes.len(),1);
     }
 }
