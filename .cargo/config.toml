@@ -1,8 +1,0 @@
-[target.xtensa-esp32s3-espidf]
-linker = "ldproxy"
-runner = "espflash flash --monitor"
-rustflags = ["--cfg", "espidf_time64"]
-
-[env]
-MCU = "esp32s3"
-ESP_IDF_VERSION = "v5.5"
