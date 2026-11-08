@@ -1,0 +1,7 @@
+/target/
+/sdkconfig
+/sdkconfig.old
+/build/
+*.elf
+*.bin
+.DS_Store
