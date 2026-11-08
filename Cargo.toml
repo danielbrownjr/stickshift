@@ -16,7 +16,7 @@ esp-idf-svc = { version = "0.53", optional = true }
 log = { version = "0.4", optional = true }
 
 [build-dependencies]
-embuild = "0.33"
+embuild = { version = "0.33", features = ["espidf"] }
 
 [[bin]]
 name = "stickshift"
