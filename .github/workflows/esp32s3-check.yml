@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Linux prerequisites
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake ninja-build pkg-config python3 python3-pip python3-venv
       - name: Install Xtensa Rust and linker
@@ -31,7 +31,11 @@ jobs:
         with:
           buildtargets: esp32s3
           ldproxy: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify Xtensa Rust toolchain
+        run: |
+          rustup run esp rustc --version
+          rustup run esp rustc --print target-list | grep -F xtensa-esp32s3-espidf
+          test -d "$(rustc +esp --print sysroot)/lib/rustlib/src/rust/library"
       - name: Compile serial-only firmware
         run: cargo +esp check --target xtensa-esp32s3-espidf --no-default-features --features firmware --bin stickshift
       - name: Compile opt-in LCD preview (never flash)
