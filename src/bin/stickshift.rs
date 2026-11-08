@@ -95,8 +95,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // No PMIC writes or display operations in the normal serial-only build.
+    #[cfg(feature="lcd-preview")]
+    let mut backlight=PinDriver::output(pins.gpio38)?;
+    #[cfg(feature="lcd-preview")]
+    let mut reset=PinDriver::output(pins.gpio21)?;
+    #[cfg(feature="lcd-preview")]
+    backlight.set_low()?;
+    #[cfg(feature="lcd-preview")]
+    reset.set_low()?;
+
     // Physical LCD route requires an explicit build-time selection of rail polarity.
-    // In non-preview builds no PMIC writes or SPI display operations are performed.
     #[cfg(feature="lcd-preview")]
     let mut panel={
         let level_high=cfg!(feature="lcd-l3b-high");
@@ -104,6 +113,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         pmic::set_l3b_level(&mut RegisterAdapter(&mut i2c),level_high)
             .map_err(|e| format!("M5PM1 refused rail change: {e:?}"))?;
         FreeRtos::delay_ms(20);
+        reset.set_high()?;
+        FreeRtos::delay_ms(120);
         let spi_cfg=config::Config::new().baudrate(26.MHz().into()).data_mode(MODE_3);
         let device=SpiDeviceDriver::new_single(peripherals.spi2,pins.gpio40,pins.gpio39,
             Option::<AnyInputPin>::None,Some(pins.gpio41),
@@ -116,14 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     #[cfg(feature="lcd-preview")]
-    let mut backlight=PinDriver::output(pins.gpio38)?;
-    #[cfg(feature="lcd-preview")]
-    let mut _reset=PinDriver::output(pins.gpio21)?;
-    #[cfg(feature="lcd-preview")]
     {
-        // Hard reset after SPI configuration and before panel init belongs ahead
-        // of the initializer. This block is intentionally held behind the feature.
-        _reset.set_high()?;
         backlight.set_high()?;
         render(&mut panel,&Snapshot{page:app.page.label(),imu:Health::Pending,
             power:Health::Ready,samples:app.samples,pitch:None,roll:None})
