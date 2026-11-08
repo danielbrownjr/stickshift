@@ -38,10 +38,10 @@ A normal firmware build still uses USB serial only. The LCD integration is compi
 Example compile-only selection (not a flash command):
 
 ```sh
-cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features firmware,lcd-preview,lcd-l3b-low
+cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features firmware,lcd-preview,lcd-l3b-high
 ```
 
-Do not assume that low is the right polarity solely because it appears in an official snippet: other hardware reports conflict.
+StickS3 M5GFX uses HIGH for the display rail; retain explicit opt-in until target compilation and physical verification are complete.
 
 ## Host tests
 
