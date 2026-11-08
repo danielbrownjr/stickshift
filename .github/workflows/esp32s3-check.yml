@@ -1,0 +1,89 @@
+name: ESP32-S3 target check
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "build.rs"
+      - "sdkconfig.defaults"
+      - "sdkconfig.defaults.boot-diagnostic"
+      - ".cargo/**"
+      - "src/**"
+      - ".github/workflows/esp32s3-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: esp32s3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - name: Linux prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake ninja-build pkg-config python3 python3-pip python3-venv
+      - name: Install Xtensa Rust and linker
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: esp32s3
+          ldproxy: true
+      - name: Verify Xtensa Rust toolchain
+        run: |
+          rustup run esp rustc --version
+          rustup run esp rustc --print target-list | grep -F xtensa-esp32s3-espidf
+          test -d "$(rustc +esp --print sysroot)/lib/rustlib/src/rust/library"
+      - name: Compile serial-only firmware
+        run: cargo +esp check --target xtensa-esp32s3-espidf --no-default-features --features firmware --bin stickshift
+      - name: Compile opt-in LCD preview (never flash)
+        run: cargo +esp check --target xtensa-esp32s3-espidf --no-default-features --features firmware,lcd-preview,lcd-l3b-high --bin stickshift
+
+      - name: Link serial-only firmware ELF
+        run: |
+          set -euo pipefail
+          cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features firmware --bin stickshift
+          mkdir -p dist/serial
+          cp target/xtensa-esp32s3-espidf/debug/stickshift dist/serial/stickshift.elf
+          file dist/serial/stickshift.elf
+      - name: Link guarded LCD-preview firmware ELF
+        run: |
+          set -euo pipefail
+          cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features firmware,lcd-preview,lcd-l3b-high --bin stickshift
+          mkdir -p dist/lcd-preview
+          cp target/xtensa-esp32s3-espidf/debug/stickshift dist/lcd-preview/stickshift.elf
+          file dist/lcd-preview/stickshift.elf
+      - name: Link experimental boot diagnostic (never flash)
+        env:
+          ESP_IDF_SDKCONFIG_DEFAULTS: sdkconfig.defaults.boot-diagnostic
+          ESP_IDF_SDKCONFIG: sdkconfig.boot-diagnostic
+          CARGO_TARGET_DIR: target/boot-diagnostic
+          CARGO_WORKSPACE_DIR: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features boot-diagnostic --bin boot-diagnostic
+          mkdir -p dist/boot-diagnostic
+          cp target/boot-diagnostic/xtensa-esp32s3-espidf/debug/boot-diagnostic dist/boot-diagnostic/boot-diagnostic.elf
+          cp sdkconfig.defaults.boot-diagnostic dist/boot-diagnostic/sdkconfig.defaults
+          file dist/boot-diagnostic/boot-diagnostic.elf
+
+      - name: Create reproducibility manifest and SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "commit=${GITHUB_SHA}" "source_head=${{ github.event.pull_request.head.sha || github.sha }}" "target=xtensa-esp32s3-espidf" "profile=dev" "serial_features=firmware" "lcd_preview_features=firmware,lcd-preview,lcd-l3b-high" "boot_diagnostic_features=boot-diagnostic" "hardware_tested=no" "flash_performed=no" > dist/BUILD.txt
+          cargo +esp --version >> dist/BUILD.txt
+          rustc +esp --version >> dist/BUILD.txt
+          cp Cargo.lock dist/Cargo.lock
+          (cd dist && sha256sum serial/stickshift.elf lcd-preview/stickshift.elf boot-diagnostic/boot-diagnostic.elf boot-diagnostic/sdkconfig.defaults Cargo.lock > SHA256SUMS)
+          cat dist/SHA256SUMS
+      - name: Upload ESP32-S3 firmware build artifacts (no flash)
+        uses: actions/upload-artifact@v6
+        with:
+          name: stickshift-esp32s3-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
