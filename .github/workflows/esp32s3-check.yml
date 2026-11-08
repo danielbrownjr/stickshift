@@ -1,0 +1,38 @@
+name: ESP32-S3 target check
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "build.rs"
+      - "sdkconfig.defaults"
+      - ".cargo/**"
+      - "src/**"
+      - ".github/workflows/esp32s3-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: esp32s3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang libclang-dev cmake ninja-build pkg-config python3 python3-pip python3-venv
+      - name: Install Xtensa Rust and linker
+        uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          buildtargets: esp32s3
+          ldproxy: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Compile serial-only firmware
+        run: cargo +esp check --target xtensa-esp32s3-espidf --no-default-features --features firmware --bin stickshift
+      - name: Compile opt-in LCD preview (never flash)
+        run: cargo +esp check --target xtensa-esp32s3-espidf --no-default-features --features firmware,lcd-preview,lcd-l3b-low --bin stickshift
