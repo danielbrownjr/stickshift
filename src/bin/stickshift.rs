@@ -75,10 +75,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let peripherals=Peripherals::take()?;
     let pins=peripherals.pins;
 
-    let mut a=PinDriver::input(pins.gpio11)?;
-    let mut b=PinDriver::input(pins.gpio12)?;
-    a.set_pull(Pull::Up)?;
-    b.set_pull(Pull::Up)?;
+    let a=PinDriver::input(pins.gpio11,Pull::Up)?;
+    let b=PinDriver::input(pins.gpio12,Pull::Up)?;
     let mut i2c=I2cDriver::new(peripherals.i2c0,pins.gpio47,pins.gpio48,
         &I2cConfig::new().baudrate(Hertz(100_000)))?;
     let mut app=App::default();
