@@ -3,6 +3,7 @@
 
 pub mod pmic;
 pub mod dashboard;
+pub mod st7789;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Motion {

@@ -25,9 +25,11 @@ Source: https://docs.m5stack.com/en/core/StickS3
 
 The M5PM1 driver in `src/pmic.rs` provides an identity-checked, read-modify-write, readback-verified L3B enable sequence using only GPIO2 fields. It is **not called by firmware yet**, because physical verification of the PMIC output polarity and the full display path is still required. Do not substitute undocumented whole-register writes.
 
-The display layout in `src/dashboard.rs` is a hardware-independent, allocation-free command layer for a future ST7789 renderer. It explicitly shows `NO DATA` until sensor sampling works. It is **not yet displayed on hardware**. The BMI270 Bosch configuration initialization remains a separate milestone.
+The display layout in `src/dashboard.rs` is a hardware-independent, allocation-free command layer. The `src/st7789.rs` renderer now implements ST7789P3 initialization commands, fixed 135×240 offsets (52,40), clipped rectangles, streamed RGB565 fills and an 8×8 text renderer over a safe `DisplayIo` trait. These are **host-tested protocol routines**, not yet wired to an ESP32-S3 SPI peripheral. It explicitly shows `NO DATA` until sensor sampling works. It is **not yet displayed on hardware**. The BMI270 Bosch configuration initialization remains a separate milestone.
 
 Register source: https://github.com/m5stack/M5PM1/tree/main/src ; board wiring: https://docs.m5stack.com/en/core/StickS3
+
+**Power polarity hold:** M5Stack's L3B API example drives GPIO2 low, while a separate hardware-verified Zephyr port reports high. The existing PMIC helper is not invoked from firmware; select and verify the correct rail polarity from the board schematic or hardware before connecting it. Do not interpret host tests as permission to flash this power-control path.
 
 ## Host tests
 
@@ -48,7 +50,7 @@ Flashing is a separate action and is **not** performed by this project import. D
 ## Increments
 
 1. v0.1: USB serial, buttons, read-only I2C identification (starter only; hardware unverified)
-2. v0.2: L3B safe PMIC driver and dashboard layout (implemented and unit-tested in host CI; not yet wired to firmware), followed by ST7789 SPI integration
+2. v0.2: Guarded PMIC driver, dashboard and ST7789 protocol renderer (host-tested, ESP-IDF SPI transport and physical panel not yet validated)
 3. v0.3: BMI270 Bosch configuration, acceleration, gyro and motion dashboard
 4. v0.4: ES8311 audio meter and IR activity
 5. v0.5: validated battery telemetry and low-power modes
