@@ -23,19 +23,19 @@ Source: https://docs.m5stack.com/en/core/StickS3
 
 ## L3B and screen bring-up design
 
-The M5PM1 driver in `src/pmic.rs` provides identity-checked, read-modify-write, readback-verified L3B GPIO2 level control using only GPIO2 fields. The caller must explicitly choose the output level. It is **not called by firmware yet**, because physical verification of the PMIC output polarity and the full display path is still required. Do not substitute undocumented whole-register writes.
+The M5PM1 driver in `src/pmic.rs` provides identity-checked, read-modify-write, readback-verified L3B GPIO2 level control using only GPIO2 fields. The caller must explicitly choose the output level. It is called only in the explicitly enabled LCD preview. The default serial-only firmware makes no power-rail changes. Do not substitute undocumented whole-register writes.
 
-The display layout in `src/dashboard.rs` is a hardware-independent, allocation-free command layer. The `src/st7789.rs` renderer now implements ST7789P3 initialization commands, fixed 135×240 offsets (52,40), clipped rectangles, streamed RGB565 fills and an 8×8 text renderer over a safe `DisplayIo` trait. These are **host-tested protocol routines**. A guarded ESP-IDF SPI transport is implemented behind the optional `lcd-preview` feature, but has **not** been cross-compiled or electrically validated. It explicitly shows `NO DATA` until sensor sampling works. It is **not yet displayed on hardware**. The BMI270 Bosch configuration initialization remains a separate milestone.
+The display layout in `src/dashboard.rs` is a hardware-independent, allocation-free command layer. The `src/st7789.rs` renderer now implements ST7789P3 initialization commands, fixed 135×240 offsets (52,40), clipped rectangles, streamed RGB565 fills and an 8×8 text renderer over a safe `DisplayIo` trait. These are **host-tested protocol routines**. A guarded ESP-IDF SPI transport is implemented behind the optional `lcd-preview` feature and both firmware feature sets have passed the ESP32-S3 `cargo check` gate, but neither has been electrically validated. It explicitly shows `NO DATA` until sensor sampling works. It is **not yet displayed on hardware**. The BMI270 Bosch configuration initialization remains a separate milestone.
 
 Register source: https://github.com/m5stack/M5PM1/tree/main/src ; board wiring: https://docs.m5stack.com/en/core/StickS3
 
 The PMIC's documented device-ID register (`0x00`) normally reports `0x6E`; register `0x01` is a *separate* device-model value, not a combined 16-bit ID. StickShift validates only the documented ID and masks GPIO2 writes.
 
-**Power polarity hold:** M5Stack's L3B API example drives GPIO2 low, while a separate hardware-verified Zephyr port reports high. The PMIC helper is invoked **only** when the opt-in LCD preview is compiled. Verify the correct rail polarity from the board schematic and hardware before selecting a preview feature. Do not interpret host tests as permission to flash this power-control path.
+**Vendor LCD polarity:** M5GFX's StickS3-specific `sticks3_power_on` sets M5PM1 GPIO2 HIGH by setting bit `0x04` in register `0x11`. The preview uses this polarity explicitly; no automatic PMIC writes in the default build. On-device behavior is still unverified. Reference: https://github.com/m5stack/M5GFX/blob/master/src/board_detect/m5/pmic_ops.hpp
 
 ### Opt-in LCD integration (experimental, do not flash without validation)
 
-A normal firmware build still uses USB serial only. The LCD integration is compiled only with `lcd-preview` and exactly one of `lcd-l3b-low` or `lcd-l3b-high`. These options deliberately have no default. Selecting one writes the M5PM1 PYG2 L3B power gate and then uses SPI2 (G40 clock, G39 MOSI, G41 CS, G45 DC), display reset G21, and backlight G38. The experiment requires the board's actual rail polarity and LCD reset sequence to be independently validated. The preview currently has no target-build or physical-test evidence.
+A normal firmware build still uses USB serial only. The LCD integration is compiled only with `lcd-preview` and exactly one of `lcd-l3b-low` or `lcd-l3b-high`. These options deliberately have no default. Selecting one writes the M5PM1 PYG2 L3B power gate and then uses SPI2 (G40 clock, G39 MOSI, G41 CS, G45 DC), display reset G21, and backlight G38. The experiment requires the board's actual rail polarity and LCD reset sequence to be independently validated. The preview has passed ESP32-S3 target `cargo check`, but has no physical-test evidence.
 
 Example compile-only selection (not a flash command):
 
@@ -44,6 +44,12 @@ cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features
 ```
 
 StickS3 M5GFX uses HIGH for the display rail; retain explicit opt-in until target compilation and physical verification are complete.
+
+## CI firmware artifacts (not automatically flashed)
+
+The ESP32-S3 CI builds both `firmware` (serial-only) and `firmware,lcd-preview,lcd-l3b-high` (guarded display preview) as linked ELF firmware images. If the complete workflow passes, its GitHub Actions **Artifacts** section includes `serial/stickshift.elf` and `lcd-preview/stickshift.elf`, the resolved `Cargo.lock`, SHA-256 checksums, and `BUILD.txt` recording the exact commit and build configuration. Download via the corresponding workflow run.
+
+The ELFs are suitable as inputs to an ESP-IDF-compatible flashing tool such as `espflash`, but **no flash command is run by CI**, and neither image has yet been tested on the physical StickS3. The LCD-preview version changes the PMIC power rail, so do not select or flash it without an explicit hardware bring-up decision. A successful cross-build alone does not establish device safety or correct display operation.
 
 ## Host tests
 
@@ -59,7 +65,7 @@ Set up the Espressif Rust toolchain, ESP-IDF, `ldproxy`, and `espflash` using th
 cargo +esp build --features firmware --bin stickshift --target xtensa-esp32s3-espidf
 ```
 
-Flashing is a separate action and is **not** performed by this project import. Dependency versions have not been cross-compiled or validated.
+Flashing is a separate action and is **not** performed by this project import. Both serial-only and LCD-preview firmware configurations have passed ESP32-S3 `cargo check` in GitHub Actions. Actual linked binary creation and flashing must be verified independently.
 
 ## Increments
 
