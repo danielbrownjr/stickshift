@@ -10,9 +10,9 @@ default = []
 firmware = ["dep:esp-idf-hal", "dep:esp-idf-sys", "dep:log", "dep:esp-idf-svc"]
 
 [dependencies]
-esp-idf-hal = { version = "0.46", optional = true }
+esp-idf-hal = { version = "0.47", optional = true }
 esp-idf-sys = { version = "0.38", optional = true, features = ["binstart"] }
-esp-idf-svc = { version = "0.52", optional = true }
+esp-idf-svc = { version = "0.53", optional = true }
 log = { version = "0.4", optional = true }
 
 [build-dependencies]
