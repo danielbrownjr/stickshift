@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
+//! Board-independent sensing and UI state. No hardware or IDF coupling.
 
 pub mod pmic;
 pub mod dashboard;
-//! Board-independent sensing and UI state. No hardware or IDF coupling.
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Motion {
