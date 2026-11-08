@@ -4,7 +4,7 @@ Safe-Rust pocket sensor lab for **M5Stack StickS3 (K150)**. No expansion modules
 
 ## Honest status
 
-**v0.1 is a board-bring-up starter, not a complete motion dashboard.** Firmware uses onboard buttons, attempts read-only BMI270 and ES8311 identification on the I2C bus, and emits a USB serial heartbeat. Application logic for motion, tilt, thresholds, page navigation and debounce has tests but is not yet connected to live IMU samples. It does **not yet** configure/read BMI270 motion, activate LCD power, capture audio, decode IR, or estimate battery state. This project has not been built or tested on physical hardware.
+**v0.1 is a board-bring-up starter, not a complete motion dashboard.** Firmware uses onboard buttons, attempts read-only BMI270 and ES8311 identification on the I2C bus, and emits a USB serial heartbeat. Application logic for motion, tilt, thresholds, page navigation and debounce has tests but is not yet connected to live IMU samples. The default build does **not** configure/read BMI270 motion, activate LCD power, capture audio, decode IR, or estimate battery state. The gated LCD preview is experimental and unverified on target. This project has not been built or tested on physical hardware.
 
 ## Hardware map
 
@@ -23,13 +23,13 @@ Source: https://docs.m5stack.com/en/core/StickS3
 
 ## L3B and screen bring-up design
 
-The M5PM1 driver in `src/pmic.rs` provides an identity-checked, read-modify-write, readback-verified L3B enable sequence using only GPIO2 fields. It is **not called by firmware yet**, because physical verification of the PMIC output polarity and the full display path is still required. Do not substitute undocumented whole-register writes.
+The M5PM1 driver in `src/pmic.rs` provides identity-checked, read-modify-write, readback-verified L3B GPIO2 level control using only GPIO2 fields. The caller must explicitly choose the output level. It is **not called by firmware yet**, because physical verification of the PMIC output polarity and the full display path is still required. Do not substitute undocumented whole-register writes.
 
 The display layout in `src/dashboard.rs` is a hardware-independent, allocation-free command layer. The `src/st7789.rs` renderer now implements ST7789P3 initialization commands, fixed 135×240 offsets (52,40), clipped rectangles, streamed RGB565 fills and an 8×8 text renderer over a safe `DisplayIo` trait. These are **host-tested protocol routines**. A guarded ESP-IDF SPI transport is implemented behind the optional `lcd-preview` feature, but has **not** been cross-compiled or electrically validated. It explicitly shows `NO DATA` until sensor sampling works. It is **not yet displayed on hardware**. The BMI270 Bosch configuration initialization remains a separate milestone.
 
 Register source: https://github.com/m5stack/M5PM1/tree/main/src ; board wiring: https://docs.m5stack.com/en/core/StickS3
 
-**Power polarity hold:** M5Stack's L3B API example drives GPIO2 low, while a separate hardware-verified Zephyr port reports high. The existing PMIC helper is not invoked from firmware; select and verify the correct rail polarity from the board schematic or hardware before connecting it. Do not interpret host tests as permission to flash this power-control path.
+**Power polarity hold:** M5Stack's L3B API example drives GPIO2 low, while a separate hardware-verified Zephyr port reports high. The PMIC helper is invoked **only** when the opt-in LCD preview is compiled. Verify the correct rail polarity from the board schematic and hardware before selecting a preview feature. Do not interpret host tests as permission to flash this power-control path.
 
 ### Opt-in LCD integration (experimental, do not flash without validation)
 
