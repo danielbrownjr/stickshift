@@ -25,11 +25,23 @@ Source: https://docs.m5stack.com/en/core/StickS3
 
 The M5PM1 driver in `src/pmic.rs` provides an identity-checked, read-modify-write, readback-verified L3B enable sequence using only GPIO2 fields. It is **not called by firmware yet**, because physical verification of the PMIC output polarity and the full display path is still required. Do not substitute undocumented whole-register writes.
 
-The display layout in `src/dashboard.rs` is a hardware-independent, allocation-free command layer. The `src/st7789.rs` renderer now implements ST7789P3 initialization commands, fixed 135×240 offsets (52,40), clipped rectangles, streamed RGB565 fills and an 8×8 text renderer over a safe `DisplayIo` trait. These are **host-tested protocol routines**, not yet wired to an ESP32-S3 SPI peripheral. It explicitly shows `NO DATA` until sensor sampling works. It is **not yet displayed on hardware**. The BMI270 Bosch configuration initialization remains a separate milestone.
+The display layout in `src/dashboard.rs` is a hardware-independent, allocation-free command layer. The `src/st7789.rs` renderer now implements ST7789P3 initialization commands, fixed 135×240 offsets (52,40), clipped rectangles, streamed RGB565 fills and an 8×8 text renderer over a safe `DisplayIo` trait. These are **host-tested protocol routines**. A guarded ESP-IDF SPI transport is implemented behind the optional `lcd-preview` feature, but has **not** been cross-compiled or electrically validated. It explicitly shows `NO DATA` until sensor sampling works. It is **not yet displayed on hardware**. The BMI270 Bosch configuration initialization remains a separate milestone.
 
 Register source: https://github.com/m5stack/M5PM1/tree/main/src ; board wiring: https://docs.m5stack.com/en/core/StickS3
 
 **Power polarity hold:** M5Stack's L3B API example drives GPIO2 low, while a separate hardware-verified Zephyr port reports high. The existing PMIC helper is not invoked from firmware; select and verify the correct rail polarity from the board schematic or hardware before connecting it. Do not interpret host tests as permission to flash this power-control path.
+
+### Opt-in LCD integration (experimental, do not flash without validation)
+
+A normal firmware build still uses USB serial only. The LCD integration is compiled only with `lcd-preview` and exactly one of `lcd-l3b-low` or `lcd-l3b-high`. These options deliberately have no default. Selecting one writes the M5PM1 PYG2 L3B power gate and then uses SPI2 (G40 clock, G39 MOSI, G41 CS, G45 DC), display reset G21, and backlight G38. The experiment requires the board's actual rail polarity and LCD reset sequence to be independently validated. The preview currently has no target-build or physical-test evidence.
+
+Example compile-only selection (not a flash command):
+
+```sh
+cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features firmware,lcd-preview,lcd-l3b-low
+```
+
+Do not assume that low is the right polarity solely because it appears in an official snippet: other hardware reports conflict.
 
 ## Host tests
 
