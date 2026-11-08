@@ -29,6 +29,8 @@ The display layout in `src/dashboard.rs` is a hardware-independent, allocation-f
 
 Register source: https://github.com/m5stack/M5PM1/tree/main/src ; board wiring: https://docs.m5stack.com/en/core/StickS3
 
+The PMIC's documented device-ID register (`0x00`) normally reports `0x6E`; register `0x01` is a *separate* device-model value, not a combined 16-bit ID. StickShift validates only the documented ID and masks GPIO2 writes.
+
 **Power polarity hold:** M5Stack's L3B API example drives GPIO2 low, while a separate hardware-verified Zephyr port reports high. The PMIC helper is invoked **only** when the opt-in LCD preview is compiled. Verify the correct rail polarity from the board schematic and hardware before selecting a preview feature. Do not interpret host tests as permission to flash this power-control path.
 
 ### Opt-in LCD integration (experimental, do not flash without validation)
