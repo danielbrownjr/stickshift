@@ -1,6 +1,7 @@
+#![forbid(unsafe_code)]
+
 pub mod pmic;
 pub mod dashboard;
-#![forbid(unsafe_code)]
 //! Board-independent sensing and UI state. No hardware or IDF coupling.
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
