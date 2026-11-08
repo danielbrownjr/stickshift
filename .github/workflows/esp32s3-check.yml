@@ -6,6 +6,7 @@ on:
       - "Cargo.lock"
       - "build.rs"
       - "sdkconfig.defaults"
+      - "sdkconfig.defaults.boot-diagnostic"
       - ".cargo/**"
       - "src/**"
       - ".github/workflows/esp32s3-check.yml"
@@ -55,15 +56,29 @@ jobs:
           mkdir -p dist/lcd-preview
           cp target/xtensa-esp32s3-espidf/debug/stickshift dist/lcd-preview/stickshift.elf
           file dist/lcd-preview/stickshift.elf
+      - name: Link experimental boot diagnostic (never flash)
+        env:
+          ESP_IDF_SDKCONFIG_DEFAULTS: sdkconfig.defaults.boot-diagnostic
+          ESP_IDF_SDKCONFIG: sdkconfig.boot-diagnostic
+          CARGO_TARGET_DIR: target/boot-diagnostic
+          CARGO_WORKSPACE_DIR: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          cargo +esp build --target xtensa-esp32s3-espidf --no-default-features --features boot-diagnostic --bin boot-diagnostic
+          mkdir -p dist/boot-diagnostic
+          cp target/boot-diagnostic/xtensa-esp32s3-espidf/debug/boot-diagnostic dist/boot-diagnostic/boot-diagnostic.elf
+          cp sdkconfig.defaults.boot-diagnostic dist/boot-diagnostic/sdkconfig.defaults
+          file dist/boot-diagnostic/boot-diagnostic.elf
+
       - name: Create reproducibility manifest and SHA-256 checksums
         shell: bash
         run: |
           set -euo pipefail
-          printf '%s\n' "commit=${GITHUB_SHA}" "target=xtensa-esp32s3-espidf" "profile=dev" "serial_features=firmware" "lcd_preview_features=firmware,lcd-preview,lcd-l3b-high" "hardware_tested=no" "flash_performed=no" > dist/BUILD.txt
+          printf '%s\n' "commit=${GITHUB_SHA}" "source_head=${{ github.event.pull_request.head.sha || github.sha }}" "target=xtensa-esp32s3-espidf" "profile=dev" "serial_features=firmware" "lcd_preview_features=firmware,lcd-preview,lcd-l3b-high" "boot_diagnostic_features=boot-diagnostic" "hardware_tested=no" "flash_performed=no" > dist/BUILD.txt
           cargo +esp --version >> dist/BUILD.txt
           rustc +esp --version >> dist/BUILD.txt
           cp Cargo.lock dist/Cargo.lock
-          (cd dist && sha256sum serial/stickshift.elf lcd-preview/stickshift.elf Cargo.lock > SHA256SUMS)
+          (cd dist && sha256sum serial/stickshift.elf lcd-preview/stickshift.elf boot-diagnostic/boot-diagnostic.elf boot-diagnostic/sdkconfig.defaults Cargo.lock > SHA256SUMS)
           cat dist/SHA256SUMS
       - name: Upload ESP32-S3 firmware build artifacts (no flash)
         uses: actions/upload-artifact@v6

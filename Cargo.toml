@@ -8,6 +8,7 @@ description = "Safe-Rust pocket diagnostics for M5Stack StickS3"
 [features]
 default = []
 firmware = ["dep:esp-idf-hal", "dep:esp-idf-sys", "dep:log", "dep:esp-idf-svc"]
+boot-diagnostic = ["dep:esp-idf-sys"]
 lcd-preview = ["firmware", "dep:embedded-hal"]
 lcd-l3b-low = []
 lcd-l3b-high = []
@@ -27,3 +28,8 @@ embuild = { version = "0.33", features = ["espidf"] }
 name = "stickshift"
 path = "src/bin/stickshift.rs"
 required-features = ["firmware"]
+
+[[bin]]
+name = "boot-diagnostic"
+path = "src/bin/boot_diagnostic.rs"
+required-features = ["boot-diagnostic"]

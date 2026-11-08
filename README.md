@@ -68,6 +68,28 @@ Before any approved device write:
 
 Retained copy of that artifact: [Techbenders / Projects / StickShift](https://drive.google.com/drive/folders/1rl-gwIEKAPRFpJTEJuqAy67IxErjHk2u). Preserve checksum and original build manifest with it.
 
+## Experimental boot diagnostic
+
+`boot-diagnostic` is a separate ESP32-S3 binary for investigating startup and USB
+enumeration. It prints a Rust entry marker and a numbered heartbeat through the
+ESP-IDF console, with UART0 at 115200 baud as the primary output and USB
+Serial/JTAG as the secondary output. It leaves buttons, I²C, display, PMIC,
+radio, and storage out of the application.
+
+Build without accessing the board:
+
+```sh
+ESP_IDF_SDKCONFIG_DEFAULTS=sdkconfig.defaults.boot-diagnostic \
+ESP_IDF_SDKCONFIG=sdkconfig.boot-diagnostic \
+cargo +esp build --target xtensa-esp32s3-espidf --no-default-features \
+  --features boot-diagnostic --bin boot-diagnostic
+```
+
+CI includes the diagnostic ELF and its defaults in the firmware archive. The
+diagnostic is unverified on physical hardware. Capture a normal-boot UART0
+trace from the installed image before considering a separately authorized
+diagnostic flash.
+
 ## Host tests
 
 ```sh
